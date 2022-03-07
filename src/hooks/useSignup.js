@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { projectAuth } from '../firebase/config'
+import { projectAuth, projectStorage, projectFirestore } from '../firebase/config'
 import { useAuthContext } from './useAuthContext'
 
 export const useSignup = () => {
@@ -8,10 +8,10 @@ export const useSignup = () => {
   const [isPending, setIsPending] = useState(false)
   const { dispatch } = useAuthContext()
 
-  const signup = async (email, password, displayName) => {
+  const signup = async (email, password, displayName, thumbnail) => {
     setError(null)
     setIsPending(true)
-  
+
     try {
       // signup
       const res = await projectAuth.createUserWithEmailAndPassword(email, password)
@@ -20,8 +20,24 @@ export const useSignup = () => {
         throw new Error('Could not complete signup')
       }
 
-      // add display name to user
-      await res.user.updateProfile({ displayName })
+      // after we ve got UID in auth proccess we can use it:
+      // upload user thumbnail
+      // create upload path:
+      const uploadPath = `thumbnails/${res.user.uid}/${thumbnail.name}`
+      // uploading image
+      const img = await projectStorage.ref(uploadPath).put(thumbnail) //firstly we give reference path, then what we gonna put to this path (directory). this give us an response we encaps in var called img.
+      // from this object which we get back from fb.stor we can get for example image url wich we want to update our profile next:
+      const imgUrl = await img.ref.getDownloadURL()
+
+      // add display name to user, and photoURL.
+      await res.user.updateProfile({ displayName, photoURL: imgUrl })
+
+      //create a user firestore document - so we later can grab this data of each user to show it on app (not only the one user that is at now logged in - in global context)
+      await projectFirestore.collection('users').doc(res.user.uid).set({
+        online: true,
+        displayName,
+        photoURL: imgUrl
+      })
 
       // dispatch login action
       dispatch({ type: 'LOGIN', payload: res.user })
@@ -30,8 +46,8 @@ export const useSignup = () => {
         setIsPending(false)
         setError(null)
       }
-    } 
-    catch(err) {
+    }
+    catch (err) {
       if (!isCancelled) {
         setError(err.message)
         setIsPending(false)
