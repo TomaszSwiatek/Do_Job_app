@@ -1,8 +1,13 @@
 // styles
 import './Create.css'
+
 import { useEffect, useState } from 'react'
 import Select from 'react-select' //additional package
 import { useCollection } from '../../hooks/useCollection'
+import { timestamp } from '../../firebase/config'
+import { useAuthContext } from '../../hooks/useAuthContext'
+import { useFirestore } from '../../hooks/useFirestore'
+import { useNavigate } from 'react-router-dom'
 
 const categories = [
     { value: 'development', label: 'Development' },
@@ -24,6 +29,9 @@ export default function Create() {
     const [category, setCategory] = useState('')
     const [assignedUsers, setAssignedUsers] = useState([])
     const [formError, setFormError] = useState(null)
+    const { user } = useAuthContext()
+    const { addDocument, response } = useFirestore('projects')
+    const navigate = useNavigate()
 
     // fetching and creating users array of objects to use in select visible component to assignedUsers to project
     useEffect(() => {
@@ -38,7 +46,7 @@ export default function Create() {
         }
     }, [documents])
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault()
         setFormError(null) //reset error state
 
@@ -51,9 +59,35 @@ export default function Create() {
             return
         }
 
+        const createdBy = {
+            displayName: user.displayName,
+            photoURL: user.photoURL,
+            id: user.uid
+        }
+
+        const assignedUsersList = assignedUsers.map(user => {
+            return {
+                displayName: user.value.displayName,
+                photoURL: user.value.photoURL,
+                id: user.value.id
+            }
+        })
+        const project = {
+            name: name,
+            details: details,
+            category: category.value,
+            dueDate: timestamp.fromDate(new Date(dueDate)),
+            comments: [],
+            createdBy: createdBy,
+            assignedUsersList
+        }
 
 
-        console.log(name, details, dueDate, category.value, assignedUsers)
+        await addDocument(project)
+        if (!response.error) {
+            navigate('/')
+        }
+
 
     }
 
