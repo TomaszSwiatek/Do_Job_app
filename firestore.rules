@@ -1,9 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if
-          request.time < timestamp.date(2022, 3, 30);
+    // users collection rules:
+    match /users/{user_id}{
+      allow read, create: if request.auth !=null; //someone is logged in (authenticated)- fb knows it becouse everytime sends a webtoken with every request
+      allow update: if request.auth.uid == user_id; //if id of user is equakl to id of document (we did it just like that in this project) - so only update when user own this document
+    }
+    // projects collection rules:
+    match /projects/{project_id}{
+      allow read, create, update: if request.auth !=null;
+      allow delete: if request.auth.uid == resource.data.createdBy.id //allow delete it if property createdBy.id in any project is equal to id of user. - so only owner can delete project.
     }
   }
 }
+
+// to save in terminal you have to : firebase deploy --only firestore - and it should be updated in firebase rules
